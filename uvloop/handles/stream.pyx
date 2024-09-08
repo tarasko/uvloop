@@ -470,7 +470,7 @@ cdef class UVStream(UVBaseTransport):
         if not buf_len:
             return
 
-        if (<uv.uv_stream_t*>self._handle).write_queue_size == 0:
+        if not self._protocol_paused and (<uv.uv_stream_t*>self._handle).write_queue_size == 0:
             # libuv internal write buffers for this stream are empty.
             if buf_len == 1:
                 # If we only have one piece of data to send, let's
@@ -686,6 +686,47 @@ cdef class UVStream(UVBaseTransport):
         if self._conn_lost:
             self._conn_lost += 1
             return
+
+        cdef ssize_t bytes_written
+
+        if (not self._protocol_paused and self._buffer_size == 0 and
+            (<uv.uv_stream_t*>self._handle).write_queue_size == 0):
+
+            bytes_written_ = self._try_write(buf)
+
+            if bytes_written_ is None:
+                # A `self._fatal_error` was called.
+                # It might not raise an exception under some
+                # conditions.
+                if not self._closing:
+                    raise RuntimeError('stream is open after '
+                                       'UVStream._try_write returned None')
+
+                return
+
+            bytes_written = bytes_written_
+
+            if bytes_written == 0:
+                # All data was successfully written.
+                # on_write will call "maybe_resume_protocol".
+                return
+
+            if bytes_written > 0:
+                if UVLOOP_DEBUG:
+                    if bytes_written == len(buf):
+                        raise RuntimeError('_try_write sent all data and '
+                                           'returned non-zero')
+
+                if PyBytes_CheckExact(buf):
+                    # Cast bytes to memoryview to avoid copying
+                    # data that wasn't sent.
+                    buf = memoryview(buf)
+                buf = buf[bytes_written_:]
+
+            # At this point it's either data was sent partially,
+            # or an EAGAIN has happened.
+            # buffer remaining data and send it later
+
         self._buffer_write(buf)
         self._initiate_write()
 
@@ -904,7 +945,6 @@ cdef void __uv_stream_on_write(
     uv.uv_write_t* req,
     int status,
 ) noexcept with gil:
-
     if UVLOOP_DEBUG:
         if req.data is NULL:
             aio_logger.error(
