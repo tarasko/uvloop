@@ -38,8 +38,8 @@ cdef class SSLProtocol:
 
         object _extra
 
-        object _write_backlog
-        size_t _write_buffer_size
+        list _write_backlog
+        Py_ssize_t _write_buffer_size
 
         object _waiter
         Loop _loop
@@ -114,7 +114,9 @@ cdef class SSLProtocol:
 
     # Outgoing flow
 
-    cdef inline _write_appdata(self, list_of_data, object context)
+    cdef inline bint _is_protocol_ready(self) except? -1
+    cdef inline _check_and_enqueue_appdata(self, data)
+    cdef inline _flush_write_backlog(self, object context)
     cdef inline _do_write(self)
     cdef inline _process_outgoing(self)
 
@@ -128,7 +130,7 @@ cdef class SSLProtocol:
     # Flow control for writes from APP socket
 
     cdef inline _control_app_writing(self, object context=*)
-    cdef inline size_t _get_write_buffer_size(self)
+    cdef inline Py_ssize_t _get_write_buffer_size(self)
     cdef inline _set_write_buffer_limits(self, high=*, low=*)
 
     # Flow control for reads to APP socket
@@ -137,8 +139,7 @@ cdef class SSLProtocol:
     cdef inline _resume_reading(self, object context)
 
     # Flow control for reads from SSL socket
-
     cdef inline _control_ssl_reading(self)
     cdef inline _set_read_buffer_limits(self, high=*, low=*)
-    cdef inline size_t _get_read_buffer_size(self)
+    cdef inline Py_ssize_t _get_read_buffer_size(self)
     cdef inline _fatal_error(self, exc, message=*)
