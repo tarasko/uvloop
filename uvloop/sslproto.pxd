@@ -139,6 +139,7 @@ cdef class SSLProtocol:
     cdef inline _resume_reading(self, object context)
 
     # Flow control for reads from SSL socket
+
     cdef inline _control_ssl_reading(self)
     cdef inline _set_read_buffer_limits(self, high=*, low=*)
     cdef inline Py_ssize_t _get_read_buffer_size(self)
