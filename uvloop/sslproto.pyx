@@ -676,7 +676,7 @@ cdef class SSLProtocol:
 
     # Outgoing flow
 
-    cdef bint _is_protocol_ready(self) except? -1:
+    cdef bint _is_protocol_ready(self) except -1:
         if self._state in (FLUSHING, SHUTDOWN, UNWRAPPED):
             if self._conn_lost >= LOG_THRESHOLD_FOR_CONNLOST_WRITES:
                 aio_logger.warning('SSL connection is closed')
